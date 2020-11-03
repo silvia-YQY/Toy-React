@@ -13,7 +13,7 @@ class ElementWrapper {
 
 class TextWrapper {
   constructor(content) {
-    this.root = document.createTextNode(type);
+    this.root = document.createTextNode(content);
   }
 }
 
@@ -49,15 +49,23 @@ export function createElement (type, attributes, ...children) {
   for (let p in attributes) {
     e.setAttribute(p, attributes[p]);
   }
-  for (let child of children) {
-    if (typeof child === 'string') {
-      child = new TextWrapper(child);
+  let insertChildren = (children) => {
+    for (let child of children) {
+      if (typeof child === 'string') {
+        child = new TextWrapper(child);
+      }
+      if (typeof child === "object" && child instanceof Array) {
+        insertChildren(child)
+      } else {
+        e.appendChild(child);
+      }
+
     }
-    e.appendChild(child);
   }
+  insertChildren(children);
   return e;
 }
 
-export function render () {
-
+export function render (component, parentElement) {
+  parentElement.appendChild(component.root);
 }
