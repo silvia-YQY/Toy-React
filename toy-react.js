@@ -12,7 +12,12 @@ class ElementWrapper {
       // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
       this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase()), value);
     } else {
-      this.root.setAttribute(name, value);
+      // 处理className属性
+      if (name === "className") {
+        this.root.setAttribute('class', value)
+      } else {
+        this.root.setAttribute(name, value);
+      }
     }
   }
   appendChild (component) {
@@ -57,8 +62,19 @@ export class Component {
     this.render()[RENDER_TO_DOM](range);
   }
   rerender () {
-    this._range.deleteContents();
-    this[RENDER_TO_DOM](this._range);
+    // 先保存旧range
+    let oldRange = this._range;
+    // 先新建一个新的range，插入到当前清空的位置
+    // 起终点均为老range的位置
+    // 以免清空了range之后，后面相邻的range补上，使得错位
+    let newRange = document.createRange();
+    newRange.setStart(oldRange.startContainer, oldRange.startOffset)
+    newRange.setEnd(oldRange.startContainer, oldRange.startOffset)
+    this[RENDER_TO_DOM](newRange);
+    // 由于插入 newRange 时，在oldRange的宽度内，所以需要重新设定起点
+    oldRange.setStart(newRange.endContainer, newRange.endOffset);
+    // 清空当前range
+    oldRange.deleteContents();
   }
   setState (newState) {
     // state初始化
@@ -103,6 +119,7 @@ export function createElement (type, attributes, ...children) {
       if (typeof child === 'string') {
         child = new TextWrapper(child);
       }
+      if (child === null) continue;
       if (typeof child === "object" && child instanceof Array) {
         insertChildren(child)
       } else {
