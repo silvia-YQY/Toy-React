@@ -12,6 +12,7 @@ class MyComponent extends Component {
     return <div>4
       <h1>MyComponent</h1>
       <span>{this.state.a.toString()}</span>
+      {/* 相当于 setState */}
       <button onClick={() => { this.state.a++; this.rerender() }}>add</button>
     </div>
   }

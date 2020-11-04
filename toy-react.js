@@ -60,6 +60,30 @@ export class Component {
     this._range.deleteContents();
     this[RENDER_TO_DOM](this._range);
   }
+  setState (newState) {
+    // state初始化
+    if (this.state === null || typeof this.state !== 'object') {
+      this.state = newState;
+      this.rerender();
+      return;
+    }
+    // 合并setState
+    let merge = (oldState, newState) => {
+      for (let p in newState) {
+        // 由于typeof(null) === 'object' , 所以需要单独校验是否object类型
+        // js中的巨坑
+        if (oldState[p] === null || typeof this.state !== 'object') {
+          // 若旧数据中不存在，则直接赋值
+          oldState[p] = newState[p];
+        } else { // 否则递归调用merge
+          // 进行深拷贝
+          merge(oldState[p], newState[p])
+        }
+      }
+    }
+    merge(this.setState, newState);
+    this.rerender();
+  }
 }
 
 // jsx 转译成 dom 节点
