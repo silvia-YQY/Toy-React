@@ -72,7 +72,7 @@ export class Component {
       for (let p in newState) {
         // 由于typeof(null) === 'object' , 所以需要单独校验是否object类型
         // js中的巨坑
-        if (oldState[p] === null || typeof this.state !== 'object') {
+        if (oldState[p] === null || typeof oldState[p] !== 'object') {
           // 若旧数据中不存在，则直接赋值
           oldState[p] = newState[p];
         } else { // 否则递归调用merge
@@ -81,7 +81,7 @@ export class Component {
         }
       }
     }
-    merge(this.setState, newState);
+    merge(this.state, newState);
     this.rerender();
   }
 }
