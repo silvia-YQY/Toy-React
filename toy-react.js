@@ -1,3 +1,4 @@
+// 利用Symbol设置私有变量
 const RENDER_TO_DOM = Symbol("render to dom")
 
 class ElementWrapper {
@@ -5,7 +6,14 @@ class ElementWrapper {
     this.root = document.createElement(type);
   }
   setAttribute (name, value) {
-    this.root.setAttribute(name, value);
+    // 匹配以on开头的属性   [\s\S] 表示匹配所有字符 
+    if (name.match(/^on([\s\S]+)/)) {
+      // RegExp.$1 表示正则里面的（）匹配语，即事件名称
+      // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
+      this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase()), value);
+    } else {
+      this.root.setAttribute(name, value);
+    }
   }
   appendChild (component) {
     let range = document.createRange();
@@ -13,6 +21,7 @@ class ElementWrapper {
     range.setEnd(this.root, this.root.childNodes.length);
     component[RENDER_TO_DOM](range);
   }
+  // 当前class中的私有render函数
   [RENDER_TO_DOM] (range) {
     range.deleteContents();
     range.insertNode(this.root);
@@ -34,6 +43,7 @@ export class Component {
     this.props = Object.create(null);
     this.children = [];
     this._root = null;
+    this._range = null;
   }
   setAttribute (name, value) {
     this.props[name] = value;
@@ -41,14 +51,14 @@ export class Component {
   appendChild (component) {
     this.children.push(component);
   }
+  // this._render  / 私有变量：渲染函数
   [RENDER_TO_DOM] (range) {
+    this._range = range;
     this.render()[RENDER_TO_DOM](range);
   }
-  get root () {
-    if (!this._root) {
-      this._root = this.render().root;
-    }
-    return this._root;
+  rerender () {
+    this._range.deleteContents();
+    this[RENDER_TO_DOM](this._range);
   }
 }
 

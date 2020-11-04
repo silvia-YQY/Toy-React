@@ -9,10 +9,10 @@ class MyComponent extends Component {
     }
   }
   render () {
-    return <div>
+    return <div>4
       <h1>MyComponent</h1>
       <span>{this.state.a.toString()}</span>
-      {this.children}
+      <button onClick={() => { this.state.a++; this.rerender() }}>add</button>
     </div>
   }
 }
@@ -20,7 +20,7 @@ class MyComponent extends Component {
 
 
 render(<MyComponent id="p" class="c">
-  <div>324</div>
-  <div></div>
-  <div></div>
+  <div>1</div>
+  <div>2</div>
+  <div>3</div>
 </MyComponent>, document.body);
