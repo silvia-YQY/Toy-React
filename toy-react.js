@@ -1,35 +1,47 @@
 // 利用Symbol设置私有变量
-const RENDER_TO_DOM = Symbol("render to dom")
-
+const RENDER_TO_DOM = Symbol('render to dom');
+//创造dom，并代理dom元素的方法
 class ElementWrapper {
   constructor(type) {
+    this.type = type;
     this.root = document.createElement(type);
   }
-  setAttribute (name, value) {
-    // 匹配以on开头的属性   [\s\S] 表示匹配所有字符 
+  setAttribute(name, value) {
+    // 匹配以on开头的属性   [\s\S] 表示匹配所有字符
     if (name.match(/^on([\s\S]+)/)) {
       // RegExp.$1 表示正则里面的（）匹配语，即事件名称
       // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
-      this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase()), value);
+      this.root.addEventListener(
+        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
+        value
+      );
     } else {
       // 处理className属性
-      if (name === "className") {
-        this.root.setAttribute('class', value)
+      if (name === 'className') {
+        this.root.setAttribute('class', value);
       } else {
         this.root.setAttribute(name, value);
       }
     }
   }
-  appendChild (component) {
+  appendChild(component) {
     let range = document.createRange();
     range.setStart(this.root, this.root.childNodes.length);
     range.setEnd(this.root, this.root.childNodes.length);
     component[RENDER_TO_DOM](range);
   }
   // 当前class中的私有render函数
-  [RENDER_TO_DOM] (range) {
+  [RENDER_TO_DOM](range) {
     range.deleteContents();
     range.insertNode(this.root);
+  }
+
+  get Vdom() {
+    return {
+      type: this.type,
+      props: this.props,
+      children: this.children.map((child) => child.vdom),
+    };
   }
 }
 
@@ -37,7 +49,7 @@ class TextWrapper {
   constructor(content) {
     this.root = document.createTextNode(content);
   }
-  [RENDER_TO_DOM] (range) {
+  [RENDER_TO_DOM](range) {
     range.deleteContents();
     range.insertNode(this.root);
   }
@@ -50,33 +62,33 @@ export class Component {
     this._root = null;
     this._range = null;
   }
-  setAttribute (name, value) {
+  setAttribute(name, value) {
     this.props[name] = value;
   }
-  appendChild (component) {
+  appendChild(component) {
     this.children.push(component);
   }
   // this._render  / 私有变量：渲染函数
-  [RENDER_TO_DOM] (range) {
+  [RENDER_TO_DOM](range) {
     this._range = range;
     this.render()[RENDER_TO_DOM](range);
   }
-  rerender () {
+  rerender() {
     // 先保存旧range
     let oldRange = this._range;
     // 先新建一个新的range，插入到当前清空的位置
     // 起终点均为老range的位置
     // 以免清空了range之后，后面相邻的range补上，使得错位
     let newRange = document.createRange();
-    newRange.setStart(oldRange.startContainer, oldRange.startOffset)
-    newRange.setEnd(oldRange.startContainer, oldRange.startOffset)
+    newRange.setStart(oldRange.startContainer, oldRange.startOffset);
+    newRange.setEnd(oldRange.startContainer, oldRange.startOffset);
     this[RENDER_TO_DOM](newRange);
     // 由于插入 newRange 时，在oldRange的宽度内，所以需要重新设定起点
     oldRange.setStart(newRange.endContainer, newRange.endOffset);
     // 清空当前range
     oldRange.deleteContents();
   }
-  setState (newState) {
+  setState(newState) {
     // state初始化
     if (this.state === null || typeof this.state !== 'object') {
       this.state = newState;
@@ -91,24 +103,25 @@ export class Component {
         if (oldState[p] === null || typeof oldState[p] !== 'object') {
           // 若旧数据中不存在，则直接赋值
           oldState[p] = newState[p];
-        } else { // 否则递归调用merge
+        } else {
+          // 否则递归调用merge
           // 进行深拷贝
-          merge(oldState[p], newState[p])
+          merge(oldState[p], newState[p]);
         }
       }
-    }
+    };
     merge(this.state, newState);
     this.rerender();
   }
 }
 
 // jsx 转译成 dom 节点
-export function createElement (type, attributes, ...children) {
+export function createElement(type, attributes, ...children) {
   let e;
-  if (typeof type === "string") {
+  if (typeof type === 'string') {
     e = new ElementWrapper(type);
   } else {
-    e = new type;
+    e = new type();
   }
 
   for (let p in attributes) {
@@ -120,19 +133,18 @@ export function createElement (type, attributes, ...children) {
         child = new TextWrapper(child);
       }
       if (child === null) continue;
-      if (typeof child === "object" && child instanceof Array) {
-        insertChildren(child)
+      if (typeof child === 'object' && child instanceof Array) {
+        insertChildren(child);
       } else {
         e.appendChild(child);
       }
-
     }
-  }
+  };
   insertChildren(children);
   return e;
 }
 
-export function render (component, parentElement) {
+export function render(component, parentElement) {
   let range = document.createRange();
   range.setStart(parentElement, 0);
   range.setEnd(parentElement, parentElement.childNodes.length);
