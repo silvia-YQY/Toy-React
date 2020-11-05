@@ -1,60 +1,6 @@
 // 利用Symbol设置私有变量
 const RENDER_TO_DOM = Symbol('render to dom');
-//创造dom，并代理dom元素的方法
-class ElementWrapper {
-  constructor(type) {
-    this.type = type;
-    this.root = document.createElement(type);
-  }
-  setAttribute(name, value) {
-    // 匹配以on开头的属性   [\s\S] 表示匹配所有字符
-    if (name.match(/^on([\s\S]+)/)) {
-      // RegExp.$1 表示正则里面的（）匹配语，即事件名称
-      // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
-      this.root.addEventListener(
-        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
-        value
-      );
-    } else {
-      // 处理className属性
-      if (name === 'className') {
-        this.root.setAttribute('class', value);
-      } else {
-        this.root.setAttribute(name, value);
-      }
-    }
-  }
-  appendChild(component) {
-    let range = document.createRange();
-    range.setStart(this.root, this.root.childNodes.length);
-    range.setEnd(this.root, this.root.childNodes.length);
-    component[RENDER_TO_DOM](range);
-  }
-  // 当前class中的私有render函数
-  [RENDER_TO_DOM](range) {
-    range.deleteContents();
-    range.insertNode(this.root);
-  }
-
-  get Vdom() {
-    return {
-      type: this.type,
-      props: this.props,
-      children: this.children.map((child) => child.vdom),
-    };
-  }
-}
-
-class TextWrapper {
-  constructor(content) {
-    this.root = document.createTextNode(content);
-  }
-  [RENDER_TO_DOM](range) {
-    range.deleteContents();
-    range.insertNode(this.root);
-  }
-}
-
+// 主类
 export class Component {
   constructor() {
     this.props = Object.create(null);
@@ -112,6 +58,111 @@ export class Component {
     };
     merge(this.state, newState);
     this.rerender();
+  }
+  get vdom() {
+    return this.render().vdom;
+  }
+  get vchildren() {
+    return this.children.map((child) => child.vdom);
+  }
+}
+
+//创造dom，并代理dom元素的方法
+class ElementWrapper extends Component {
+  constructor(type) {
+    super(type);
+    this.type = type;
+    // this.root = document.createElement(type);
+  }
+  /*
+  // 存this.props.
+  setAttribute(name, value) {
+    // 匹配以on开头的属性   [\s\S] 表示匹配所有字符
+    if (name.match(/^on([\s\S]+)/)) {
+      // RegExp.$1 表示正则里面的（）匹配语，即事件名称
+      // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
+      this.root.addEventListener(
+        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
+        value
+      );
+    } else {
+      // 处理className属性
+      if (name === 'className') {
+        this.root.setAttribute('class', value);
+      } else {
+        this.root.setAttribute(name, value);
+      }
+    }
+  }
+  // 存this.children
+  appendChild(component) {
+    let range = document.createRange();
+    range.setStart(this.root, this.root.childNodes.length);
+    range.setEnd(this.root, this.root.childNodes.length);
+    component[RENDER_TO_DOM](range);
+  }
+  */
+  // 当前class中的私有render函数
+  [RENDER_TO_DOM](range) {
+    range.deleteContents();
+    let root = document.createElement(this.type);
+
+    for (let name in this.props) {
+      // 匹配以on开头的属性   [\s\S] 表示匹配所有字符
+      let value = this.props[name];
+      if (name.match(/^on([\s\S]+)/)) {
+        // RegExp.$1 表示正则里面的（）匹配语，即事件名称
+        // 由于react中on事件使用小驼峰，所以需要把匹配到的事件转为全小写，以免大小写敏感无法绑定时间
+        root.addEventListener(
+          RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
+          value
+        );
+      } else {
+        // 处理className属性
+        if (name === 'className') {
+          root.setAttribute('class', value);
+        } else {
+          root.setAttribute(name, value);
+        }
+      }
+    }
+
+    for (let child of this.children) {
+      let childRange = document.createRange();
+      childRange.setStart(root, root.childNodes.length);
+      childRange.setEnd(root, root.childNodes.length);
+      child[RENDER_TO_DOM](childRange);
+    }
+    range.insertNode(root);
+  }
+
+  get vdom() {
+    return this;
+    /*{
+      type: this.type,
+      props: this.props,
+      children: this.children.map((child) => child.vdom),
+    };*/
+  }
+}
+
+class TextWrapper extends Component {
+  constructor(content) {
+    super(content);
+    this.content = content;
+    this.type = '#text';
+    this.root = document.createTextNode(content);
+  }
+  [RENDER_TO_DOM](range) {
+    range.deleteContents();
+    range.insertNode(this.root);
+  }
+  get vdom() {
+    return this;
+    /* {
+      type: '#text',
+      content: this.content,
+    };*/
   }
 }
 
