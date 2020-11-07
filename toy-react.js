@@ -17,8 +17,68 @@ export class Component {
   // this._render  / 私有变量：渲染函数
   [RENDER_TO_DOM](range) {
     this._range = range;
-    this.render()[RENDER_TO_DOM](range);
+    this._vdom = this.vdom; // 重新render并且得到新的vdom树
+    this._vdom[RENDER_TO_DOM](range);
   }
+  // vdom 比对
+  update() {
+    // 节点对比是否相同节点
+    let isSameNode = (oldNode, newNode) => {
+      // 类型不同
+      if (oldNode.type !== newNode.type) return false;
+      for (let name in newNode.props) {
+        // 属性不同
+        if (newNode.props[name] !== oldNode.props[name]) return false;
+      }
+      // 属性数量不同
+      if (Object.keys(oldNode.props).length > Object.keys(newNode.props).length) return false;
+      // 文本节点内容不同
+      if (newNode.type === '#text') {
+        if (newNode.content !== oldNode.content) return false;
+        return true;
+      }
+    };
+    let update = (oldNode, newNode) => {
+      // type, props, children
+      // 若节点不同，则newNode替换oldNode，重新渲染
+      if (!isSameNode(oldNode, newNode)) {
+        newNode[RENDER_TO_DOM](oldNode._range);
+        return;
+      }
+      // 若节点相同，则强行把旧节点赋值给新节点
+      newNode._range = oldNode._range;
+      //newNode.children 为 component
+      let newChildren = newNode.vchildren;
+      let oldChildren = oldNode.vchildren;
+
+      if (!newChildren || !newChildren.length) return;
+
+      // 保存oldChildren最后一个range
+      let tailRange = oldChildren[oldChildren.length - 1]._range;
+
+      for (let i = 0; i < newChildren.length; i++) {
+        let newChild = newChildren[i];
+        let oldChild = oldChildren[i];
+        // newChildren 有可能长于 oldChildren
+        if (i < oldChildren.length) {
+          update(oldChild, newChild);
+        } else {
+          // 创建一个插入的range
+          let range = document.createRange();
+          range.setStart(tailRange.endContainer, tailRange.endOffset);
+          range.setEnd(tailRange.endContainer, tailRange.endOffset);
+          // newChild 追加到后面
+          newChild[RENDER_TO_DOM](range);
+          tailRange = range;
+          // TODO
+        }
+      }
+    };
+    let vdom = this.vdom;
+    update(this._vdom, vdom);
+    this._vdom = vdom;
+  }
+  /*
   rerender() {
     // 先保存旧range
     let oldRange = this._range;
@@ -34,6 +94,7 @@ export class Component {
     // 清空当前range
     oldRange.deleteContents();
   }
+  */
   setState(newState) {
     // state初始化
     if (this.state === null || typeof this.state !== 'object') {
@@ -57,14 +118,14 @@ export class Component {
       }
     };
     merge(this.state, newState);
-    this.rerender();
+    this.update();
   }
   get vdom() {
     return this.render().vdom;
   }
-  get vchildren() {
-    return this.children.map((child) => child.vdom);
-  }
+  // get vchildren() {
+  //   return this.children.map((child) => child.vdom);
+  // }
 }
 
 //创造dom，并代理dom元素的方法
@@ -104,7 +165,7 @@ class ElementWrapper extends Component {
   */
   // 当前class中的私有render函数
   [RENDER_TO_DOM](range) {
-    range.deleteContents();
+    this._range = range;
     let root = document.createElement(this.type);
 
     for (let name in this.props) {
@@ -127,16 +188,23 @@ class ElementWrapper extends Component {
       }
     }
 
-    for (let child of this.children) {
+    // 确保this.vchildren存在
+    if (!this.vchildren) {
+      this.vchildren = this.children.map((child) => child.vdom);
+    }
+
+    for (let child of this.vchildren) {
       let childRange = document.createRange();
       childRange.setStart(root, root.childNodes.length);
       childRange.setEnd(root, root.childNodes.length);
       child[RENDER_TO_DOM](childRange);
     }
-    range.insertNode(root);
+
+    replaceContent(range, root);
   }
 
   get vdom() {
+    this.vchildren = this.children.map((child) => child.vdom);
     return this;
     /*{
       type: this.type,
@@ -151,11 +219,11 @@ class TextWrapper extends Component {
     super(content);
     this.content = content;
     this.type = '#text';
-    this.root = document.createTextNode(content);
   }
   [RENDER_TO_DOM](range) {
-    range.deleteContents();
-    range.insertNode(this.root);
+    this._range = range;
+    let root = document.createTextNode(this.content);
+    replaceContent(range, root);
   }
   get vdom() {
     return this;
@@ -164,6 +232,15 @@ class TextWrapper extends Component {
       content: this.content,
     };*/
   }
+}
+
+// 处理由于需要更新，导致range置空后，后面的range向前位移的错位现象
+function replaceContent(range, node) {
+  range.insertNode(node); // 先在range中插入node
+  range.setStartAfter(node); // 再把range挪到node之后
+  range.deleteContents(node); // 再把range的内容删掉
+  range.setStartBefore(node); // 把range设回node之后 ，以免移位
+  range.setEndAfter(node);
 }
 
 // jsx 转译成 dom 节点
